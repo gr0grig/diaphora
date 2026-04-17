@@ -140,13 +140,6 @@ DEFAULT_PARTIAL_RATIO = 0.5
 # can relax the minimum ratio needed to consider a match good or bad.
 DEFAULT_TRUSTED_PARTIAL_RATIO = 0.3
 
-# Every single constant that is matched for a functions pair adds a small value
-# to the total generated ratio. A little hack here is that for different cpu
-# targets, if we increase the ratio a little, it will match better multiple
-# functions that were missed before (or generated a too low ratio).
-INCREASE_RATIO_PER_CONSTANT_MATCH_SAME_CPU = 0.006
-INCREASE_RATIO_PER_CONSTANT_MATCH = 0.008
-
 # Regular expressions used to clean-up the pseudo-code and assembly dumps in
 # order to get better comparison ratios.
 CLEANING_CMP_REPS = ["loc_", "j_nullsub_", "nullsub_", "j_sub_", "sub_",
@@ -201,12 +194,24 @@ THREADS_WAIT_TIME = 1
 
 
 #-------------------------------------------------------------------------------
-# Diaphora can use a local mode, enable this configuration directive to use it.
-ML_USE_TRAINED_MODEL = True
-# Model trained with a decision tree classifier: fast and accurate enough
-ML_TRAINED_MODEL = os.path.join(CONFIGURATION_DIRECTORY, "ml/diaphora-amalgamation-model.pkl")
-# The value added to the similarity ratio for a positive match using the model.
-ML_TRAINED_MODEL_MATCH_SCORE = 0.15
+# Diaphora can try to train using Ridge regression a classifier specific for the
+# current set of binaries using matches labelled as "Best" or "Partial" in order
+# to try to learn what is a good match specifically for the two binaries being
+# compared. This approach seems to work when there are a lot of initial matches,
+# and seems to cause a lot of false positives when there aren't enough good
+# initial matches. This configuration directive is used to enable/disable this
+# experimental feature.
+ML_TRAIN_LOCAL_MODEL = False
+
+# What is the minimum ratio required for a match to be considered for usage to
+# train a local model?
+ML_MATCHES_MIN_RATIO = 0.7
+ML_MIN_PREDICTION_RATIO = 0.75
+
+# What value should be added to the final similarity ratio when the specialized
+# classifier (trained with known good and bad results found for the current two
+# binaries being compared) finds what it thinks is a good match.
+ML_DEEP_RATIO_ADDED_SCORE = 0.1
 
 # Show a chooser with all the matches that the classifier think are good ones?
 ML_DEBUG_SHOW_MATCHES = True
@@ -219,4 +224,4 @@ SHOW_IMPORT_WARNINGS = True
 
 #-------------------------------------------------------------------------------
 # Workarounds for IDA bugs
-DIAPHORA_WORKAROUND_MAX_TINFO_T = False
+DIAPHORA_WORKAROUND_MAX_TINFO_T = True

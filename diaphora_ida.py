@@ -720,7 +720,7 @@ class CBinDiffExporterSetup(Form):
 
   Export options:
   <Use the decompiler if available:{rUseDecompiler}>
-  <#Use this option to enable or disable exporting microcode#Export microcode instructions and basic blocks:{rExportMicrocode}>
+  <#Enable this option to disable exporting microcode#Export microcode instructions and basic blocks:{rExportMicrocode}>
   <Do not export library and thunk functions:{rExcludeLibraryThunk}>
   <#Enable if you want neither sub_* functions nor library functions to be exported#Export only non-IDA generated functions:{rNonIdaSubs}>
   <#Export only function summaries, not all instructions. Showing differences in a graph between functions will not be available.#Do not export instructions and basic blocks:{rFuncSummariesOnly}>
@@ -733,7 +733,7 @@ class CBinDiffExporterSetup(Form):
   <Use speed ups:{rExperimental}##Use tricks to speed ups some of the most common diffing tasks>
   <#Enable this option to ignore sub_* names for the 'Same name' heuristic.#Ignore automatically generated names:{rIgnoreSubNames}>
   <#Enable this option to ignore all function names for the 'Same name' heuristic.#Ignore all function names:{rIgnoreAllNames}>
-  <#Enable this option to use the Machine Learning engine with an already trained model specified in diaphora_config.py!ML_TRAINED_MODEL.#Use an already trained model:{rUseTrainedModel}>{cGroup1}>
+  <#Enable this option to use the Machine Learning engine and generate a dataset with known good and bad results specific to the 2 binaries being compared.#Train a specialized classifier (experimental ML support):{rMachineLearning}>{cGroup1}>
 
   Project specific rules:
   <#Select the project specific Python script rules#Python script:{iProjectSpecificRules}>
@@ -763,7 +763,7 @@ class CBinDiffExporterSetup(Form):
           "rExperimental",
           "rIgnoreSubNames",
           "rIgnoreAllNames",
-          "rUseTrainedModel"
+          "rMachineLearning"
         )
       ),
       "iProjectSpecificRules": Form.FileInput(
@@ -788,7 +788,7 @@ class CBinDiffExporterSetup(Form):
     self.rExcludeLibraryThunk.checked = opts.exclude_library_thunk
     self.rUnreliable.checked = opts.unreliable
     self.rSlowHeuristics.checked = opts.slow
-    self.rUseTrainedModel.checked = opts.use_trained_model
+    self.rMachineLearning.checked = opts.machine_learning
     self.rRelaxRatio.checked = opts.relax
     self.rExperimental.checked = opts.experimental
     self.iMinEA.value = opts.min_ea
@@ -811,7 +811,7 @@ class CBinDiffExporterSetup(Form):
       exclude_library_thunk=self.rExcludeLibraryThunk.checked,
       unreliable=self.rUnreliable.checked,
       slow=self.rSlowHeuristics.checked,
-      use_trained_model=self.rUseTrainedModel.checked,
+      machine_learning=self.rMachineLearning.checked,
       relax=self.rRelaxRatio.checked,
       experimental=self.rExperimental.checked,
       min_ea=self.iMinEA.value,
@@ -2195,7 +2195,6 @@ class CIDABinDiff(diaphora.CBinDiff):
       self.best_chooser,
       self.partial_chooser,
       self.unreliable_chooser,
-      self.multimatch_chooser
     ]:
       for i, item in enumerate(chooser.items):
         ea = int(item[1], 16)
@@ -2650,9 +2649,6 @@ or selecting Edit -> Plugins -> Diaphora - Show results"""
       keys.remove(base)
     keys.insert(0, base)
     for key in keys:
-      if key not in assembly:
-        log(f"Key not in `assembly` list? Key {key} Assembly {assembly}")
-        continue
       for line in assembly[key]:
         assembly_addrs.append(line[0])
         asm.append(line[1])
@@ -3312,13 +3308,6 @@ or selecting Edit -> Plugins -> Diaphora - Show results"""
     finally:
       cur.close()
 
-  def GetOrdinalCount(self):
-    # The API get_ordinal_qty() has been removed in IDA 9.0 and now I have to do
-    # this mess to support new and old versions, as is common in Diaphora.
-    if hasattr(idaapi, "get_ordinal_count"):
-      return idaapi.get_ordinal_count()
-    return idc.get_ordinal_qty()
-
   def GetLocalType(self, ordinal, flags):
     ret = get_local_tinfo(ordinal)
     if ret is not None:
@@ -3337,7 +3326,7 @@ or selecting Edit -> Plugins -> Diaphora - Show results"""
     # numbers, according to one beta-tester. My guess is that it's a bug
     # in IDA. However, as we cannot reproduce, at least handle this
     # condition.
-    local_types = self.GetOrdinalCount()
+    local_types = idc.get_ordinal_qty()
     if (local_types & 0x80000000) != 0:
       # pylint: disable-next=consider-using-f-string
       message = "warning: get_ordinal_qty returned a negative number (0x%x)!" % local_types
@@ -3358,7 +3347,7 @@ or selecting Edit -> Plugins -> Diaphora - Show results"""
       elif definition.startswith("union"):
         type_name = "union"
 
-      # For some reason, IDA may return types with the form "__int128 unsigned",
+      # For some reason, IDA my return types with the form "__int128 unsigned",
       # we want it the right way "unsigned __int128".
       if name and name.find(" ") > -1:
         names = name.split(" ")
@@ -3658,7 +3647,7 @@ def _diff_or_export(use_ui, **options):
     bd.exclude_library_thunk = opts.exclude_library_thunk
     bd.unreliable = opts.unreliable
     bd.slow_heuristics = opts.slow
-    bd.use_trained_model = opts.use_trained_model
+    bd.machine_learning = opts.machine_learning
     bd.relaxed_ratio = opts.relax
     bd.experimental = opts.experimental
     bd.min_ea = opts.min_ea
@@ -3749,8 +3738,8 @@ class BinDiffOptions:
     self.slow = kwargs.get(
       "slow", total_functions <= config.MIN_FUNCTIONS_TO_DISABLE_SLOW
     )
-    self.use_trained_model = kwargs.get(
-      "use_trained_model", config.ML_USE_TRAINED_MODEL
+    self.machine_learning = kwargs.get(
+      "machine_learning", config.ML_TRAIN_LOCAL_MODEL
     )
     self.experimental = kwargs.get(
       "experimental", config.DIFFING_ENABLE_EXPERIMENTAL
