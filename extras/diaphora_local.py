@@ -28,7 +28,10 @@ import idc
 import idaapi
 import idautils
 
-from PyQt5 import QtWidgets
+try:
+  from PySide6 import QtWidgets
+except ImportError:
+  from PyQt5 import QtWidgets
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import NasmLexer, CppLexer, DiffLexer

@@ -23,9 +23,12 @@ from idaapi import *
 from idautils import *
 
 try:
-  from PyQt5 import QtWidgets
-except ImportError as e:
-  print(f'{os.path.basename(__file__)} importerror {e}')
+  from PySide6 import QtWidgets
+except ImportError:
+  try:
+    from PyQt5 import QtWidgets
+  except ImportError as e:
+    print(f'{os.path.basename(__file__)} importerror {e}')
 
 sys.path.append("..")
 import diaphora_config as config

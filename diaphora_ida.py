@@ -70,7 +70,10 @@ except ImportError:
   HAS_GET_SOURCE_STRINGS = False
 
 # pylint: disable-next=wrong-import-order
-from PyQt5 import QtWidgets
+try:
+  from PySide6 import QtWidgets
+except ImportError:
+  from PyQt5 import QtWidgets
 
 #-------------------------------------------------------------------------------
 # Chooser items indices. They do differ from the CChooser.item items that are
@@ -1168,6 +1171,10 @@ class CIDABinDiff(diaphora.CBinDiff):
     """
     Internal use, export the database.
     """
+    # Increase recursion limit for Tarjan's SCC on complex CFGs
+    old_recursion_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(50000)
+
     callgraph_primes = 1
     callgraph_all_primes = {}
     # pylint: disable-next=consider-using-f-string
@@ -1256,6 +1263,8 @@ class CIDABinDiff(diaphora.CBinDiff):
 
     log_refresh("Creating indices...")
     self.create_indices()
+
+    sys.setrecursionlimit(old_recursion_limit)
 
   def export(self):
     """
@@ -3241,7 +3250,11 @@ or selecting Edit -> Plugins -> Diaphora - Show results"""
   def save_compilation_units(self):
     log_refresh("Finding compilation units...")
     msg("Finding compilation units...")
-    lfa_modules = self.get_modules_using_lfa()
+    try:
+      lfa_modules = self.get_modules_using_lfa()
+    except Exception as e:
+      log(f"Error finding compilation units (non-fatal): {e}")
+      return
     log_refresh("Saving compilation units...")
     msg("Saving compilation units...")
 
@@ -3326,7 +3339,11 @@ or selecting Edit -> Plugins -> Diaphora - Show results"""
     # numbers, according to one beta-tester. My guess is that it's a bug
     # in IDA. However, as we cannot reproduce, at least handle this
     # condition.
-    local_types = idc.get_ordinal_qty()
+    try:
+      local_types = idc.get_ordinal_qty()
+    except AttributeError:
+      # IDA 9.x removed idc.get_ordinal_qty, use get_ordinal_limit instead
+      local_types = get_ordinal_limit()
     if (local_types & 0x80000000) != 0:
       # pylint: disable-next=consider-using-f-string
       message = "warning: get_ordinal_qty returned a negative number (0x%x)!" % local_types
